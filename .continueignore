@@ -1,0 +1,5 @@
+# ignore a bunch of files that we may output from notebooks during experimentation
+**/*.txt
+**/*.pdf
+**/*.html
+**/*.md
