@@ -182,35 +182,35 @@ def find_headers(doc: pymupdf.Document) -> list[Heading]:
     return headings
 
 
-def to_asciidoc(doc: pymupdf.Document) -> str:
+def to_toc(doc: pymupdf.Document) -> str:
     headers = find_headers(doc)
 
-    adoc = io.StringIO()
+    toc = io.StringIO()
     for header in headers:
         level = header.type.value + 1
-        adoc.write('=' * level)
-        adoc.write(" ")
-        adoc.write(header.text)
-        adoc.write(" - ")
-        adoc.write(header.sub_text)
-        adoc.write("\n")
+        toc.write('#' * level)
+        toc.write(" ")
+        toc.write(header.text)
+        toc.write(" - ")
+        toc.write(header.sub_text)
+        toc.write("\n")
 
-    return adoc.getvalue()
+    return toc.getvalue()
 
     
 def main():
     input_dir = Path(config.STATUTES_DATA_DIR / "wy" / "pdf")
 
-    output_dir = Path(config.STATUTES_DATA_DIR / "wy" / "asciidoc")
+    output_dir = Path(config.STATUTES_DATA_DIR / "wy" / "toc" / "from_convert")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for filename in input_dir.iterdir():
         if filename.suffix == ".pdf":
             pdf_path = input_dir / filename
-            output_path = output_dir / f"{filename.stem}.adoc"
+            output_path = output_dir / f"{filename.stem}.md"
             print(f"{pdf_path} -> {output_path}")
 
-            adoc = to_asciidoc(pymupdf.open(pdf_path))
+            adoc = to_toc(pymupdf.open(pdf_path))
 
             with open(output_path, "w") as file:
                 file.write(adoc)
