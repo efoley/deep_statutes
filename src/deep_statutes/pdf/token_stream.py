@@ -1,22 +1,20 @@
-import argparse
 from pathlib import Path
-import sys
 from dataclasses import dataclass
-from typing import Callable, Iterator, Literal
+from typing import Iterator, Literal
 
 import pymupdf
-from deep_statutes.pdf.util import SpanDict, Pos
+from deep_statutes.pdf.util import SpanDict
 from deep_statutes.pdf.util import is_bbox_centered, get_bbox_indent_level
 
 MAGIC_TEMPLATE = "<<{}>>"
+
 
 def _to_magic(text: str) -> str:
     return MAGIC_TEMPLATE.format(text)
 
 
 def _concise_font_size(
-    size: float,
-    font_sizes: tuple[float, float, float, float] 
+    size: float, font_sizes: tuple[float, float, float, float]
 ) -> Literal["S", "M", "L", "XL"]:
     dist = [abs(size - fs) for fs in font_sizes]
     min_idx = dist.index(min(dist))
@@ -34,42 +32,45 @@ class PDFTokenConversionOptions:
 
     font_sizes: tuple[float, float, float, float]
 
+    page_delimiters: bool = False
+    block_delimiters: bool = False
+
+
 def pdf_to_token_stream(
-    doc: str | Path | pymupdf.Document,
-    options: PDFTokenConversionOptions
-) -> Iterator[tuple[Pos, str]]:
+    doc: str | Path | pymupdf.Document, options: PDFTokenConversionOptions
+) -> Iterator[str]:
     global_line_idx = 0
 
     if not isinstance(doc, pymupdf.Document):
         doc = pymupdf.open(doc)
 
     for page_idx, page in enumerate(doc):
-        page_pos = (page_idx,)
-        yield page_pos, _to_magic("PAGE")
+        if options.page_delimiters:
+            yield _to_magic(f"PAGE {page_idx}")
         d = page.get_text("dict")
         page_width = d["width"]
         blocks = d["blocks"]
         for block_idx, block in enumerate(blocks):
-            block_pos = page_pos + (block_idx,)
-            yield block_pos, _to_magic("BLOCK")
+            if options.block_delimiters:
+                yield _to_magic(f"BLOCK {(page_idx, block_idx)}")
             for line_idx, line in enumerate(block["lines"]):
-                line_pos = block_pos + (line_idx,)
-                yield line_pos, _to_magic("LINE")
+                yield _to_magic(f"LINE {(page_idx, block_idx, line_idx)}")
 
                 if options.infer_centered and is_bbox_centered(
                     line["bbox"], page_width
                 ):
-                    yield (page_idx, block_idx, line_idx,), _to_magic("CENTER")
+                    yield _to_magic("CENTER"),
                 else:
                     indent = get_bbox_indent_level(
-                        line["bbox"], left_margin=options.left_margin, indent_size=options.indent_size,
+                        line["bbox"],
+                        left_margin=options.left_margin,
+                        indent_size=options.indent_size,
                     )
 
                     for _ in range(indent):
-                        yield line_pos, _to_magic("INDENT")
+                        yield _to_magic("INDENT")
 
                 for span_idx, span in enumerate(line["spans"]):
-                    span_pos = line_pos + (span_idx,)
                     span: SpanDict
                     span_text = span["text"]
 
@@ -82,13 +83,13 @@ def pdf_to_token_stream(
                     span_tok = f"SPAN_{size}"
                     if is_bold:
                         span_tok += "_B"
-                    yield span_pos, _to_magic(span_tok)
-                    yield span_pos, span_text
+                    yield _to_magic(span_tok)
+                    yield span_text
 
                 global_line_idx += 1
 
 
-#def main():
+# def main():
 #    parser = argparse.ArgumentParser(description="Convert PDF to token stream")
 #    parser.add_argument("pdf_path", help="Path to the PDF file")
 #    parser.add_argument('--output', '-o', default=None, help='Output path')
@@ -103,4 +104,3 @@ def pdf_to_token_stream(
 #        f.write(token + '\n')
 #    if f != sys.stdout:
 #        f.close()
-
