@@ -1,0 +1,60 @@
+grammar = r'''
+_start: _LINE* title
+_heading_start: title_start | chapter_start | article_start | section_start
+
+title: title_start _blank_line chapter+
+
+chapter: chapter_start _blank_line article+
+
+article: article_start _blank_line many_sections 
+
+_centeredish: _INDENT*
+
+!title_number: "TITLE " NAT
+!chapter_number: "CHAPTER " NAT
+!article_number: "ARTICLE " NAT
+subtitle: RAW_UPPER_TEXT _cont_upper_line?
+
+title_start.2: _centeredish _SPAN_M title_number " - " subtitle
+chapter_start.2: _centeredish _SPAN_M chapter_number " - " subtitle
+article_start.2: _centeredish _SPAN_M article_number " - " subtitle
+_cont_upper_line: _LINE _centeredish _span_m_upper
+
+!section_number: NAT "-" NAT "-" NAT
+section_start: _INDENT _SPAN_M_B section_number "." section_subtitle?
+section_subtitle: RAW_TEXT (_LINE _sep{_span_m_b, _LINE})? 
+section: section_start (_blank_line _sep{paragraph, _blank_line})?
+
+many_sections: _sep{section, _blank_line}
+
+_blank_line: _LINE _LINE
+
+paragraph: _INDENT* _sep{_multi_span_m, _LINE}
+
+_span_m: _SPAN_M RAW_TEXT
+_span_m_upper: _SPAN_M RAW_UPPER_TEXT
+_span_m_b: _SPAN_M_B RAW_TEXT
+
+_multi_span_m: _span_m+
+_multi_span_m_b: _span_m_b+
+
+NAT: /[1-9][0-9]*/
+
+RAW_TEXT: /(?:(?!<<)[^\n])+/
+RAW_UPPER_TEXT: /(?:(?!<<)[^\na-z])+/
+
+_sep{x, sep}: x (sep x)*
+
+//_CENTER.2: /<<CENTER>>/
+_INDENT.2: /<<INDENT>>/
+_LINE.2: /<<LINE>>/
+_BLOCK.2: /<<BLOCK>>/
+_PAGE.2: /<<PAGE>>/
+
+_SPAN_M.2: /<<SPAN_M>>/
+_SPAN_M_B.2: /<<SPAN_M_B>>/
+
+EOL: /\n/
+
+%ignore EOL
+'''

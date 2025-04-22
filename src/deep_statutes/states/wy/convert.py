@@ -1,18 +1,15 @@
-import io
-from dataclasses import dataclass
-from enum import Enum, auto
+import dataclasses
+import json
 from pathlib import Path
 
 import pymupdf
-from lark import Lark, Tree
 
 from deep_statutes.pdf.token_stream import (
     pdf_to_token_stream,
     PDFTokenConversionOptions,
 )
 from deep_statutes import config
-from deep_statutes.pdf.util import Pos
-from deep_statutes.lark import find_matches
+from .parse_pdf import find_headers
 
 
 DEFAULT_OPTIONS = PDFTokenConversionOptions(
@@ -23,194 +20,55 @@ DEFAULT_OPTIONS = PDFTokenConversionOptions(
 )
 
 
-class HeadingType(Enum):
-    Title = auto()
-    Chapter = auto()
-    Article = auto()
-    Section = auto()
-
-
-@dataclass
-class Heading:
-    type: HeadingType
-    text: str
-    sub_text: str
-    pos: Pos
-
-
-def _child(tree: Tree, idx: int, name: str) -> Tree:
-    child_tree = tree.children[idx]
-    if child_tree.data != name:
-        raise ValueError(f"Expected {name}, got {child_tree.data}")
-    return child_tree
-
-
-def _text(tree: Tree):
+def write_token_stream(doc: pymupdf.Document, out_path: Path) -> None:
     """
-    Get all text from the tree's children.
-
-    This assumes that all child nodes are tokens.
+    Write the token stream to a file.
     """
-    t = []
-    for child in tree.children:
-        if isinstance(child, str):
-            t.append(child)
-        else:
-            raise ValueError(f"Expected Token/string but got {child}")
-    return "".join(t)
+    with open(out_path, "w") as file:
+        for token in pdf_to_token_stream(doc, DEFAULT_OPTIONS):
+            file.write(token)
+            file.write("\n")
 
 
-def _to_heading(pos: Pos, root: Tree) -> Heading:
-    if root.data != "_heading_start":
-        raise ValueError(f"Expected heading start, got {root.data}")
-    if len(root.children) != 1:
-        raise ValueError(f"Expected exactly one child, got {len(root.children)}")
+def write_toc(token_stream_path: Path, out_path: Path) -> None:
+    headers = find_headers(token_stream_path)
 
-    tree = root.children[0]
-    match tree.data:
-        case "title_start":
-            text = _text(_child(tree, 0, "title_number"))
-            sub_text = _text(_child(tree, 1, "subtitle"))
-            return Heading(HeadingType.Title, text, sub_text, pos)
-        case "chapter_start":
-            text = _text(_child(tree, 0, "chapter_number"))
-            sub_text = _text(_child(tree, 1, "subtitle"))
-            return Heading(HeadingType.Chapter, text, sub_text, pos)
-        case "article_start":
-            text = _text(_child(tree, 0, "article_number"))
-            sub_text = _text(_child(tree, 1, "subtitle"))
-            return Heading(HeadingType.Article, text, sub_text, pos)
-        case "section_start":
-            text = _text(_child(tree, 0, "section_number"))
-            if len(tree.children) > 1:
-                sub_text = _text(_child(tree, 1, "section_subtitle"))
-            else:
-                sub_text = ""
-            return Heading(HeadingType.Section, text, sub_text, pos)
-        case _:
-            raise ValueError(f"Unknown heading type: {tree.type}")
+    with open(out_path, "w") as out:
+        for header in headers:
+            level = header.type.value
+            out.write("#" * level)
+            out.write(" ")
+            out.write(header.text)
+            out.write(" - ")
+            out.write(header.sub_text)
+            out.write(f" ({header.text_range[0]}-{header.text_range[1]})")
+            out.write("\n")
 
 
-def _child(tree: Tree, idx: int, name: str) -> Tree:
-    child_tree = tree.children[idx]
-    if child_tree.data != name:
-        raise ValueError(f"Expected {name}, got {child_tree.data}")
-    return child_tree
-
-
-def _text(tree: Tree):
-    """
-    Get all text from the tree's children.
-
-    This assumes that all child nodes are tokens.
-    """
-    t = []
-    for child in tree.children:
-        if isinstance(child, str):
-            t.append(child)
-        else:
-            raise ValueError(f"Expected Token/string but got {child}")
-    return ''.join(t)
- 
-
-heading_grammar = r"""
-_heading_start: title_start | chapter_start | article_start | section_start
-
-title_start: _SPAN_M title_number " - " subtitle
-chapter_start: _SPAN_M chapter_number " - " subtitle
-article_start: _SPAN_M article_number " - " subtitle
-
-!title_number: "TITLE " NAT
-!chapter_number: "CHAPTER " NAT
-!article_number: "ARTICLE " NAT
-
-subtitle: RAW_UPPER_TEXT _cont_upper_line?
-_cont_upper_line: _m_upper_text
-
-!section_number: NAT "-" NAT "-" NAT
-section_start: _INDENT _SPAN_M_B section_number "." section_subtitle?
-section_subtitle: RAW_TEXT (_LINE _sep{_m_b_text, _LINE})? 
-
-_m_upper_text: _SPAN_M RAW_UPPER_TEXT
-_m_b_text: _SPAN_M_B RAW_TEXT
-
-NAT: /[1-9][0-9]*/
-
-RAW_TEXT: /(?:(?!<<)[^\n])+/
-RAW_UPPER_TEXT: /(?:(?!<<)[^\na-z])+/
-
-_sep{x, sep}: x (sep x)*
-
-_LINE: /<<LINE [a-zA-Z0-9(), ]+>>/
-_INDENT: /<<INDENT>>/
-
-_SPAN_M.2: /<<SPAN_M>>/
-_SPAN_M_B.2: /<<SPAN_M_B>>/
-
-EOL: /\n/
-
-%ignore EOL
-"""
-
-
-def find_headers(doc: pymupdf.Document) -> list[Heading]:
-    text = "\n".join(pdf_to_token_stream(doc, DEFAULT_OPTIONS))
-
-    lark = Lark(
-        heading_grammar,
-        start="_heading_start",
-        parser="lalr",
-        propagate_positions=True,
-    )
-
-    headings = []
-    text_idx = 0
-    while True:
-        # find next line
-        next_nl_idx = text.find("\n", text_idx+1)
-        if next_nl_idx == -1:
-            break
-        text_idx = next_nl_idx + 1
-        parses = find_matches(text[text_idx:], "_heading_start", lark)
-
-        if len(parses) >= 1:
-            # get longest possible parse
-            parse = parses[-1]
-            heading = _to_heading(text_idx, parse)
-            headings.append(heading)
-
-    return headings
-
-
-def to_toc(doc: pymupdf.Document) -> str:
-    headers = find_headers(doc)
-
-    toc = io.StringIO()
-    for header in headers:
-        level = header.type.value + 1
-        toc.write('#' * level)
-        toc.write(" ")
-        toc.write(header.text)
-        toc.write(" - ")
-        toc.write(header.sub_text)
-        toc.write("\n")
-
-    return toc.getvalue()
-
-    
 def main():
     input_dir = Path(config.STATUTES_DATA_DIR / "wy" / "pdf")
 
-    output_dir = Path(config.STATUTES_DATA_DIR / "wy" / "toc" / "from_convert")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    pdf_token_stream_dir = Path(
+        config.STATUTES_DATA_DIR / "wy" / "pdf" / "token_stream"
+    )
+
+    toc_dir = Path(config.STATUTES_DATA_DIR / "wy" / "toc" / "from_token_stream")
+    toc_dir.mkdir(parents=True, exist_ok=True)
+
+    # write token stream config
+    pdf_token_stream_dir.mkdir(parents=True, exist_ok=True)
+    with open(pdf_token_stream_dir / "config.json", "w") as file:
+        file.write(json.dumps(dataclasses.asdict(DEFAULT_OPTIONS), indent=4))
 
     for filename in input_dir.iterdir():
         if filename.suffix == ".pdf":
             pdf_path = input_dir / filename
-            output_path = output_dir / f"{filename.stem}.md"
-            print(f"{pdf_path} -> {output_path}")
+            token_stream_path = pdf_token_stream_dir / f"{filename.stem}.txt"
+            toc_path = toc_dir / f"{filename.stem}.md"
+            print(f"{pdf_path} ->\n\t{token_stream_path}\n\t{toc_path}")
 
-            adoc = to_toc(pymupdf.open(pdf_path))
+            doc = pymupdf.open(pdf_path)
 
-            with open(output_path, "w") as file:
-                file.write(adoc)
+            write_token_stream(doc, token_stream_path)
+
+            write_toc(token_stream_path, toc_path)
