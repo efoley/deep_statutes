@@ -54,9 +54,11 @@ def iter_spans(page: pymupdf.Page) -> Iterator[tuple[Pos, SpanDict]]:
                 yield (block_idx, line_idx, span_idx), span
 
 
-def is_bbox_centered(bbox: BBox, page_width: float, pct_tol=5.0, max_pct_width=60.) -> bool:
+def is_bbox_centered(
+    bbox: BBox, page_width: float, pct_tol=5.0, max_pct_width=60.0
+) -> bool:
     x1, y1, x2, y2 = bbox
-    if x2 - x1 >= max_pct_width/100. * page_width:
+    if x2 - x1 >= max_pct_width / 100.0 * page_width:
         return False
     center_x = (x1 + x2) / 2
     pt_tol = page_width * pct_tol / 100.0
@@ -66,6 +68,7 @@ def is_bbox_centered(bbox: BBox, page_width: float, pct_tol=5.0, max_pct_width=6
 def get_bbox_indent_level(bbox: BBox, left_margin: float, indent_size: float) -> int:
     x1 = bbox[0]
     return int(round((x1 - left_margin) / indent_size))
+
 
 def get_line_margins(page: pymupdf.Page) -> list[tuple[float, float]]:
     line_margins = []
@@ -169,9 +172,9 @@ def summarize_doc(doc: pymupdf.Document):
         fonts += unique_fonts(page)
         left_aligns += unique_left_align(page)
         line_heights += unique_line_heights(page)
-    fonts = list(set(fonts))
-    left_aligns = list(set(left_aligns))
-    line_heights = list(set(line_heights))
+    fonts = sorted(list(set(fonts)))
+    left_aligns = sorted(list(set(left_aligns)))
+    line_heights = sorted(list(set(line_heights)))
 
     print("Doc:")
     print(f"  Left Aligns: {left_aligns}")
@@ -188,12 +191,13 @@ def is_pathological(doc: pymupdf.Document) -> bool:
     if doc.is_reflowable:
         pathological = True
         print("Document is reflowable, which we don't support yet.")
+
     for page_idx, page in enumerate(doc):
         # check that page has no images or annotations
         if (
             len(page.get_images()) > 0
-            or len(page.annots()) > 0
-            or len(page.widgets()) > 0
+            or len(list(page.annots())) > 0
+            or len(list(page.widgets())) > 0
         ):
             pathological = True
             print(f"Page {page.number} has images or annotations.")
