@@ -16,8 +16,8 @@ dependencies = [
 [project.scripts]
 deep-statutes = "deep_statutes:main"
 co-download = "deep_statutes.states.co.download:main"
+co-convert = "deep_statutes.states.co.convert:main"
 wy-download = "deep_statutes.states.wy.download:main"
-wy-pdf-tokens = "deep_statutes.states.wy.token_stream:main"
 wy-convert = "deep_statutes.states.wy.convert:main"
 
 [build-system]
