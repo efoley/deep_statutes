@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
+    "beautifulsoup4>=4.13.4",
     "google-genai>=1.11.0",
     "lark>=1.2.2",
     "numpy>=2.2.5",
@@ -21,6 +22,7 @@ deep-statutes = "deep_statutes:main"
 pdf-sample = "deep_statutes.pdf.sample:main"
 co-download = "deep_statutes.states.co.download:main"
 co-convert = "deep_statutes.states.co.convert:main"
+us-download = "deep_statutes.states.us.download:main"
 wy-download = "deep_statutes.states.wy.download:main"
 wy-convert = "deep_statutes.states.wy.convert:main"
 
