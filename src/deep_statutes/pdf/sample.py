@@ -38,7 +38,7 @@ class PDFSampler:
             start_pages = []
 
         start_pages += self.gen.choice(
-            num_pages - self.min_fragment_num_pages, num_start_pages, replace=False
+            max(num_pages - self.min_fragment_num_pages, 1), num_start_pages, replace=False
         ).tolist()
 
         start_pages.sort()
