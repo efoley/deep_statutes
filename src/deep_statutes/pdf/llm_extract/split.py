@@ -162,7 +162,8 @@ def main():
             f"{'#' * level} {header.text} - {header.sub_text} (Page {header.page})\n\n"
         )
 
-    with open(args.output_dir / "toc.md", "w") as f:
+    toc_name = pdf_path.stem + "_toc.md"
+    with open(args.output_dir / toc_name, "w") as f:
         f.write(md.getvalue())
 
     split_pdf(pdf_path, toc, args.output_dir)
