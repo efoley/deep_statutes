@@ -2,56 +2,18 @@ import argparse
 import io
 import logging
 from pathlib import Path
-from typing import Optional
 
-from pydantic import BaseModel
 import pymupdf
 
-from .toc import llm_parse_toc, DocumentTOC, Header
+from deep_statutes.pdf.toc import DocumentTOC, HeaderTreeNode
+from deep_statutes.pdf.llm_extract.gemini_toc import parse_toc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class HeaderTreeNode(BaseModel):
-    header: Header
-    parent: Optional["HeaderTreeNode"]
-    children: list["HeaderTreeNode"] = []
-    page_range: tuple[int, int]  # 1-indexed and inclusive
-
-    def num_pages(self) -> int:
-        return self.page_range[1] - self.page_range[0] + 1
-
-
-def _build_header_tree(toc: DocumentTOC, num_pages: int) -> HeaderTreeNode:
-    """
-    Build a tree of headers from the TOC.
-    """
-    # TODO EDF not a big deal if this isn't true, but if so it is kind of weird and
-    # we need a "doc" level header
-    assert toc.headers[0].page == 1
-    root = HeaderTreeNode(header=toc.headers[0], parent=None, page_range=[1, num_pages])
-    path: list[HeaderTreeNode] = [root]
-    for header in toc.headers[1:]:
-        level = toc.hierarchy_level(header.type)
-        while toc.hierarchy_level(path[-1].header.type) >= level:
-            # this could happen if there isn't a toc entry for "this entire document"
-            # we could deal with that if it occurs by always putting in a header at "document" level
-            # or something
-            assert len(path) > 1
-
-            path[-1].page_range = (path[-1].page_range[0], header.page)
-            path.pop()
-        node = HeaderTreeNode(
-            header=header, parent=path[-1], page_range=[header.page, num_pages]
-        )
-        path[-1].children.append(node)
-        path.append(node)
-    return root
-
-
 def _choose_split_headers(
-    toc: DocumentTOC, num_pages: int, max_num_pages_hint: int
+    root: HeaderTreeNode, max_num_pages_hint: int
 ) -> list[HeaderTreeNode]:
     """
     Choose the headers to split the PDF on.
@@ -68,14 +30,8 @@ def _choose_split_headers(
     Returns:
         list[HeaderTreeNode]: The headers to split on.
     """
-    if len(toc.headers) == 0:
-        raise ValueError("No headers found in the TOC.")
-
-    root = _build_header_tree(toc, num_pages)
-
-    # now traverse to find split headers
+    # traverse the tree and find the headers to split on
     splits = []
-
     frontier = [root]
     while len(frontier) > 0:
         node = frontier.pop()
@@ -89,37 +45,29 @@ def _choose_split_headers(
     return splits
 
 
-def _get_path(node: HeaderTreeNode) -> str:
-    """
-    Get the path of the header in the tree.
-    """
-    path = []
-    while node is not None:
-        path.append(node.header.text.replace(" ", "_"))
-        node = node.parent
-    return "-".join(reversed(path))
+def split_pdf(
+    doc: pymupdf.Document, header_tree: HeaderTreeNode, output_dir: Path
+) -> dict[str, HeaderTreeNode]:
+    split_headers = _choose_split_headers(header_tree, max_num_pages_hint=16)
 
-
-def split_pdf(pdf_path: Path, toc: DocumentTOC, output_dir: Path):
-    doc = pymupdf.open(pdf_path)
-    num_pages = len(doc)
-    split_headers = _choose_split_headers(toc, num_pages, max_num_pages_hint=16)
+    header_to_path = {}
 
     for header in split_headers:
-        header_path = _get_path(header)
+        header_path = "-".join([h.header.text for h in header.path()])
         page_start, page_end = header.page_range
+
+        header_to_path[header_path] = header
 
         output_path = output_dir / f"{header_path}.pdf"
         logger.info(f"Writing pages {page_start}-{page_end} {output_path}.")
 
         output_doc = pymupdf.open()
         output_doc.insert_pdf(
-            doc,
-            from_page=page_start - 1,
-            to_page=page_end - 1, 
-            final=1
+            doc, from_page=page_start - 1, to_page=page_end - 1, final=1
         )
         output_doc.save(output_path)
+
+    return header_to_path
 
 
 def main():
@@ -147,7 +95,13 @@ def main():
     if not args.output_dir.exists():
         args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    toc = llm_parse_toc(pdf_path)
+    toc = parse_toc(pdf_path)
+
+    if len(toc.headers) == 0:
+        raise ValueError("No headers found in the TOC.")
+
+    doc = pymupdf.open(pdf_path)
+    root = HeaderTreeNode.from_toc(toc, len(doc))
 
     header_type_level = {h: i + 1 for i, h in enumerate(toc.header_types)}
 
@@ -166,4 +120,4 @@ def main():
     with open(args.output_dir / toc_name, "w") as f:
         f.write(md.getvalue())
 
-    split_pdf(pdf_path, toc, args.output_dir)
+    split_pdf(doc, root, args.output_dir)
