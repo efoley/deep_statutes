@@ -4,36 +4,15 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 import pdfplumber
-from pydantic import BaseModel
 
 from deep_statutes.config import GEMINI_API_KEY
+from deep_statutes.pdf.toc import DocumentTOC, Header
 
 
 logger = logging.getLogger(__name__)
 
 
 MODEL_FLASH = "gemini-2.5-flash-preview-04-17"
-
-
-class Header(BaseModel):
-    type: str
-    text: str
-    sub_text: str
-    page: int # 1-indexed
-
-
-class DocumentTOC(BaseModel):
-    header_types: list[str]
-    headers: list[Header]
-
-    def hierarchy_level(self, header_type: str) -> int:
-        """
-        Get the hierarchy level of a header type according to the document's order.
-
-        This may not actually be the order in the document since sometimes headers skip levels, but
-        it gives us a hint as to how to structure a tree representing the ToC.
-        """
-        return self.header_types.index(header_type)
 
 
 TOC_PROMPT = """\n\n
@@ -128,7 +107,7 @@ def _check_headers_present(pdf_path: Path, toc: DocumentTOC) -> list[str]:
     return not_found
 
 
-def llm_parse_toc(pdf_path: Path) -> DocumentTOC:
+def parse_toc(pdf_path: Path) -> DocumentTOC:
     toc_response = _query_toc_from_gemini(pdf_path)
 
     logger.info("Found hierarchy: " + ", ".join(toc_response.parsed.header_types))
