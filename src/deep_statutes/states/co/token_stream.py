@@ -1,8 +1,23 @@
 from pathlib import Path
+import tempfile
 
 from lark import Lark
+import pymupdf
 
 from deep_statutes.lark.util import find_matches
+from deep_statutes.pdf.token_stream import (
+    PDFTokenConversionOptions,
+    pdf_to_token_stream,
+)
+
+
+DEFAULT_OPTIONS = PDFTokenConversionOptions(
+    infer_centered=False,
+    left_margin=72.0,
+    indent_size=36.0,
+    font_sizes=[float("inf"), 12.0, 20.0, float("inf")],
+    page_delimiters=True,
+)
 
 
 footer_grammar = r"""
@@ -22,7 +37,7 @@ EOL: /\n/
 """
 
 
-def clean_token_stream(in_path: Path, out_path: Path) -> None:
+def _clean_token_stream(in_path: Path, out_path: Path) -> None:
     """
     Clean the token stream by removing footer lines.
     """
@@ -54,3 +69,20 @@ def clean_token_stream(in_path: Path, out_path: Path) -> None:
                 next_text_idx = next_nl_idx
                 f.write(text[text_idx:next_text_idx])
                 text_idx = next_text_idx
+
+
+def _write_raw_token_stream(doc: pymupdf.Document, out_path: Path) -> None:
+    with open(out_path, "w") as file:
+        for token in pdf_to_token_stream(doc, DEFAULT_OPTIONS):
+            file.write(token)
+            file.write("\n")
+
+
+def write_clean_token_stream(doc: pymupdf.Document, out_path: Path) -> None:
+    """
+    Write the token stream with headers and footers removed to the specified output path.
+    """
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as temp_file:
+        temp_path = Path(temp_file.name)
+        _write_raw_token_stream(doc, temp_path)
+        _clean_token_stream(in_path=temp_path, out_path=out_path)

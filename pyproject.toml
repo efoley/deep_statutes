@@ -19,10 +19,12 @@ dependencies = [
 
 [project.scripts]
 deep-statutes = "deep_statutes:main"
+# generic
 pdf-sample = "deep_statutes.pdf.sample:main"
 llm-split = "deep_statutes.pdf.split:main"
+# state-specific
 co-download = "deep_statutes.states.co.download:main"
-co-convert = "deep_statutes.states.co.convert:main"
+co-split = "deep_statutes.states.co.split:main"
 us-download = "deep_statutes.states.us.download:main"
 wy-download = "deep_statutes.states.wy.download:main"
 wy-convert = "deep_statutes.states.wy.convert:main"
