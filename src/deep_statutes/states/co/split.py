@@ -34,7 +34,7 @@ _subtitle: _sep{_subtitle_line, _LINE}
 !article_number: "ARTICLE " (NAT | NAT1)
 !part_number: "PART " (NAT | NAT1)
 
-!section_number: NAT "-" NAT "-" NAT
+!section_number: NAT "-" NAT "-" (NAT | NAT1)
 section_start: _INDENT _SPAN_M_B section_number "." section_subtitle?
 section_subtitle: RAW_TEXT (_LINE _sep{_m_b_text, _LINE})? 
 
