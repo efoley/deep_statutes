@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pymupdf
 
-from deep_statutes.pdf.toc import DocumentTOC, HeaderTreeNode
+from deep_statutes.pdf.toc import HeaderTreeNode
 from deep_statutes.pdf.llm_extract.gemini_toc import parse_toc
 
 logging.basicConfig(level=logging.INFO)
@@ -47,16 +47,16 @@ def _choose_split_headers(
 
 def split_pdf(
     doc: pymupdf.Document, header_tree: HeaderTreeNode, output_dir: Path
-) -> dict[str, HeaderTreeNode]:
+) -> list[tuple[HeaderTreeNode, str]]:
     split_headers = _choose_split_headers(header_tree, max_num_pages_hint=16)
 
-    header_to_path = {}
+    split_headers_paths = []
 
     for header in split_headers:
         header_path = "-".join([h.header.text for h in header.path()])
         page_start, page_end = header.page_range
 
-        header_to_path[header_path] = header
+        split_headers_paths.append((header, header_path))
 
         output_path = output_dir / f"{header_path}.pdf"
         logger.info(f"Writing pages {page_start}-{page_end} {output_path}.")
@@ -67,7 +67,7 @@ def split_pdf(
         )
         output_doc.save(output_path)
 
-    return header_to_path
+    return split_headers_paths
 
 
 def main():

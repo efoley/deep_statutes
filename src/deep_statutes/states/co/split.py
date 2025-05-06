@@ -1,4 +1,5 @@
 import argparse
+import io
 import logging
 from concurrent import futures
 from pathlib import Path
@@ -74,6 +75,32 @@ def parse_toc(token_stream_path: Path) -> DocumentTOC:
     return toc
 
 
+def _write_toc_md(
+    header_tree: HeaderTreeNode,
+    split_headers_paths: list[tuple[HeaderTreeNode, str]],
+    out_md_path: Path,
+) -> None:
+
+    md = io.StringIO()
+
+    # write the header tree to markdown
+    # note that the hierarchy level here is determined by the position in the tree
+    # and not by the header type
+    frontier = [(1, header_tree)]
+    while len(frontier) > 0:
+        level, node = frontier.pop()
+        frontier += [(level + 1, child) for child in reversed(node.children)]
+        
+        text = node.header.text
+        sub_text = node.header.sub_text
+
+        md.write(f"{'#' * level} {text} ({sub_text})\n")
+        md.write("\n")
+
+    with open(out_md_path, 'w') as f:
+        f.write(md.getvalue())
+
+
 def _process_pdf(
     pdf_path: Path,
     token_stream_path: Path,
@@ -100,7 +127,11 @@ def _process_pdf(
         split_pdf_dir,
     )
 
-    # TODO EDF write header_to_path to json
+    _write_toc_md(
+        header_tree,
+        header_to_path,
+        split_pdf_dir / f"{filename}.md",
+    )
 
 
 def main():
