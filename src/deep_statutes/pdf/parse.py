@@ -25,7 +25,7 @@ def _text(tree: Tree):
             t.append(child)
         else:
             raise ValueError(f"Expected Token/string but got {child}")
-    return "".join(t)
+    return " ".join(t).strip()
 
 
 def _to_header(
