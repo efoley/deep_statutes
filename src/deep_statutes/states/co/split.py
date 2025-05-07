@@ -80,7 +80,6 @@ def _write_toc_md(
     split_headers_paths: list[tuple[HeaderTreeNode, str]],
     out_md_path: Path,
 ) -> None:
-
     md = io.StringIO()
 
     # write the header tree to markdown
@@ -90,14 +89,14 @@ def _write_toc_md(
     while len(frontier) > 0:
         level, node = frontier.pop()
         frontier += [(level + 1, child) for child in reversed(node.children)]
-        
+
         text = node.header.text
         sub_text = node.header.sub_text
 
         md.write(f"{'#' * level} {text} ({sub_text})\n")
         md.write("\n")
 
-    with open(out_md_path, 'w') as f:
+    with open(out_md_path, "w") as f:
         f.write(md.getvalue())
 
 
@@ -105,6 +104,7 @@ def _process_pdf(
     pdf_path: Path,
     token_stream_path: Path,
     split_pdf_dir: Path,
+    max_num_pages_hint: int = 16,
 ) -> None:
     filename = pdf_path.stem
     # skip constitution for now
@@ -125,6 +125,7 @@ def _process_pdf(
         doc,
         header_tree,
         split_pdf_dir,
+        max_num_pages_hint=max_num_pages_hint,
     )
 
     _write_toc_md(
@@ -132,6 +133,12 @@ def _process_pdf(
         header_to_path,
         split_pdf_dir / f"{filename}.md",
     )
+
+    with open(
+        split_pdf_dir / f"{filename}_headers.json",
+        "w",
+    ) as f:
+        f.write(header_tree.model_dump_json(indent=2))
 
 
 def main():
@@ -151,6 +158,13 @@ def main():
         default=4,
         help="Number of parallel jobs to run.",
     )
+    parser.add_argument(
+        "-p",
+        "--max_num_pages_hint",
+        type=int,
+        default=16,
+        help="Maximum number of pages to include in each split PDF. Note that this is a hint and may be ignored if the split header is too large.",
+    )
     args = parser.parse_args()
 
     input_dir = Path(config.STATUTES_DATA_DIR / "co" / "pdf")
@@ -162,7 +176,6 @@ def main():
 
     split_pdf_root_dir = Path(output_dir / "split")
     split_pdf_root_dir.mkdir(parents=True, exist_ok=True)
-
 
     input_paths = sorted(
         input_dir.glob("crs2024-title-*.pdf"),
@@ -179,6 +192,7 @@ def main():
                 pdf_path,
                 pdf_token_stream_dir / f"{pdf_path.stem}.txt",
                 split_pdf_dir,
+                args.max_num_pages_hint,
             )
         )
 
@@ -196,4 +210,3 @@ def main():
         # we iterate through res to force the execution of the futures
         for _ in res:
             pass
-

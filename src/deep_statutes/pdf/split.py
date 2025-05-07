@@ -1,5 +1,6 @@
 import argparse
 import io
+import json
 import logging
 from pathlib import Path
 
@@ -46,17 +47,22 @@ def _choose_split_headers(
 
 
 def split_pdf(
-    doc: pymupdf.Document, header_tree: HeaderTreeNode, output_dir: Path
+    doc: pymupdf.Document,
+    header_tree: HeaderTreeNode,
+    output_dir: Path,
+    max_num_pages_hint: int = 16,
 ) -> list[tuple[HeaderTreeNode, str]]:
-    split_headers = _choose_split_headers(header_tree, max_num_pages_hint=16)
+    split_headers = _choose_split_headers(
+        header_tree, max_num_pages_hint=max_num_pages_hint
+    )
 
     split_headers_paths = []
 
-    for header in split_headers:
-        header_path = "-".join([h.header.text for h in header.path()])
-        page_start, page_end = header.page_range
+    for node in split_headers:
+        header_path = "--".join([h.header.text for h in node.path()])
+        page_start, page_end = node.page_range
 
-        split_headers_paths.append((header, header_path))
+        split_headers_paths.append((node, header_path))
 
         output_path = output_dir / f"{header_path}.pdf"
         logger.info(f"Writing pages {page_start}-{page_end} {output_path}.")
@@ -66,6 +72,19 @@ def split_pdf(
             doc, from_page=page_start - 1, to_page=page_end - 1, final=1
         )
         output_doc.save(output_path)
+
+        root = node.model_dump()
+        path = [h.header for h in node.path()]
+
+        info = {
+            "root": root,
+            "path": [h.model_dump() for h in path],
+        }
+
+        info_path = output_dir / f"{header_path}_info.json"
+
+        with open(info_path, "w") as f:
+            json.dump(info, f, indent=2)
 
     return split_headers_paths
 
