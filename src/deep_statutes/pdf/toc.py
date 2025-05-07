@@ -1,5 +1,5 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Annotated, Optional
+from pydantic import BaseModel, Field
 
 
 class Header(BaseModel):
@@ -26,7 +26,7 @@ class DocumentTOC(BaseModel):
 
 class HeaderTreeNode(BaseModel):
     header: Header
-    parent: Optional["HeaderTreeNode"]
+    parent: Annotated[Optional["HeaderTreeNode"], Field(exclude=True)] = None
     children: list["HeaderTreeNode"] = []
     page_range: tuple[int, int]  # 1-indexed and inclusive
 

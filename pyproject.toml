@@ -25,6 +25,7 @@ llm-split = "deep_statutes.pdf.split:main"
 # state-specific
 co-download = "deep_statutes.states.co.download:main"
 co-split = "deep_statutes.states.co.split:main"
+co-summarize = "deep_statutes.states.co.summarize:main"
 us-download = "deep_statutes.states.us.download:main"
 wy-download = "deep_statutes.states.wy.download:main"
 wy-convert = "deep_statutes.states.wy.convert:main"
