@@ -21,11 +21,13 @@ def _text(tree: Tree):
     """
     t = []
     for child in tree.children:
-        if isinstance(child, str):
+        if child.type == "LINE":
+            t.append(" ")
+        elif isinstance(child, str):
             t.append(child)
         else:
             raise ValueError(f"Expected Token/string but got {child}")
-    return " ".join(t).strip()
+    return "".join(t).strip()
 
 
 def _to_header(
@@ -62,28 +64,6 @@ def _to_header(
         sub_text=sub_text,
         page=page,
     )
-
-
-def _child(tree: Tree, idx: int, name: str) -> Tree:
-    child_tree = tree.children[idx]
-    if child_tree.data != name:
-        raise ValueError(f"Expected {name}, got {child_tree.data}")
-    return child_tree
-
-
-def _text(tree: Tree):
-    """
-    Get all text from the tree's children.
-
-    This assumes that all child nodes are tokens.
-    """
-    t = []
-    for child in tree.children:
-        if isinstance(child, str):
-            t.append(child)
-        else:
-            raise ValueError(f"Expected Token/string but got {child}")
-    return "".join(t)
 
 
 example_grammar_not_valid = r"""

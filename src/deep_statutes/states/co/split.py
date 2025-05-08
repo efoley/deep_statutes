@@ -26,10 +26,10 @@ article_subtitle: _subtitle
 part_subtitle: _subtitle_upper
 
 _subtitle_upper_line: _INDENT* _m_upper_text
-_subtitle_upper: _sep{_subtitle_upper_line, _LINE}
+_subtitle_upper: _sep{_subtitle_upper_line, LINE}
 
 _subtitle_line: _INDENT* _m_text
-_subtitle: _sep{_subtitle_line, _LINE}
+_subtitle: _sep{_subtitle_line, LINE}
 
 !title_number: "TITLE " NAT
 !article_number: "ARTICLE " (NAT | NAT1)
@@ -37,7 +37,7 @@ _subtitle: _sep{_subtitle_line, _LINE}
 
 !section_number: NAT "-" NAT "-" (NAT | NAT1)
 section_start: _INDENT _SPAN_M_B section_number "." section_subtitle?
-section_subtitle: RAW_TEXT (_LINE _sep{_m_b_text, _LINE})? 
+section_subtitle: RAW_TEXT (LINE _sep{_m_b_text, LINE})? 
 
 _m_upper_text: _SPAN_M RAW_UPPER_TEXT
 _m_b_text: _SPAN_M_B RAW_TEXT
@@ -51,6 +51,7 @@ RAW_UPPER_TEXT: /(?:(?!<<)[^\na-z])+/
 
 _sep{x, sep}: x (sep x)*
 
+LINE: /<<LINE [a-zA-Z0-9(), ]+>>/
 _LINE: /<<LINE [a-zA-Z0-9(), ]+>>/
 _INDENT: /<<INDENT>>/
 
@@ -64,11 +65,13 @@ EOL: /\n/
 %ignore EOL
 """
 
+HEADER_TYPES = ["title", "article", "part", "section"]
+
 
 def parse_toc(token_stream_path: Path) -> DocumentTOC:
     toc = find_headers(
         header_grammar=HEADER_GRAMMAR,
-        header_types=["title", "article", "part", "section"],
+        header_types=HEADER_TYPES,
         token_stream_path=token_stream_path,
     )
 
