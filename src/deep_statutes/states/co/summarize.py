@@ -111,8 +111,20 @@ def _process_pdf(
         pdf_path=pdf_path,
     )
 
+    with open(summary_dir / f"{pdf_path.stem}_summary.json", "w") as f:
+        s = summary.model_dump_json(indent=2)
+        f.write(s)
+
     for i, candidate in enumerate(summary.candidates):
         output_path = summary_dir / f"{pdf_path.stem}_summary_{i + 1}.txt"
+
+        if candidate.content is None:
+            # NOTE EDF I have no idea why this happens, but it does
+            logger.warning(
+                f"Candidate {i + 1} has no content. Skipping writing to {output_path}"
+            )
+            continue
+
         with open(output_path, "w") as f:
             for part in candidate.content.parts:
                 if part.thought:
