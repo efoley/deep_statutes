@@ -21,7 +21,7 @@ DEFAULT_OPTIONS = PDFTokenConversionOptions(
 
 
 footer_grammar = r"""
-footer: _crs2024 _uncert _page
+footer: _crs2024 _page _uncert
 _crs2024: _LINE _SPAN_M "Colorado Revised Statutes 2024"
 _uncert: _LINE _INDENT* _SPAN_M "Uncertified Printout"
 _page: _LINE _INDENT* _SPAN_M /Page\s+[1-9][0-9]*\s+of\s+[1-9][0-9]*/
