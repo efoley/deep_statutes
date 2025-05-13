@@ -13,6 +13,8 @@ dependencies = [
     "lark>=1.2.2",
     "numpy>=2.2.5",
     "pdfplumber>=0.11.6",
+    "polars>=1.29.0",
+    "pyarrow>=20.0.0",
     "pymupdf>=1.25.5",
     "requests>=2.32.3",
 ]
@@ -20,6 +22,7 @@ dependencies = [
 [project.scripts]
 deep-statutes = "deep_statutes:main"
 # generic
+pdf-corpus = "deep_statutes.pdf.corpus:main"
 pdf-sample = "deep_statutes.pdf.sample:main"
 llm-split = "deep_statutes.pdf.split:main"
 # state-specific
